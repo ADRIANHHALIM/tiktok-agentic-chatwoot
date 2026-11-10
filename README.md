@@ -7,33 +7,33 @@
 
   # 🎵 TikTok APIs
 
-  **TikTok Web 数据读取、互动、Creator 发布与实时消息接口的 Python 实现。**
+  **Python implementation of TikTok Web data access, interactions, Creator publishing, and real-time messaging APIs.**
 </div>
 
-> 仅供学习和技术研究。请使用自己的账号与浏览器会话，遵守平台规则，不要提交 Cookie、私钥或抓包文件。
+> For learning and technical research only. Use your own account and browser session, follow platform rules, and never submit Cookies, private keys, or network captures.
 
-## 🌟 功能
+## 🌟 Features
 
-| 场景 | 已实现的入口 |
+| Area | Available entry points |
 | --- | --- |
-| 内容与用户 | 作品详情页、主页与作品列表、推荐流、搜索、关注/粉丝、收藏夹、通知 |
-| 评论与互动 | 评论及楼中楼读取、翻页、发评论/回复、点赞、收藏、关注 |
-| Creator Studio | `creator_publish` 一次发布视频；`creator_publish_photos` 一次发布图集，默认仅自己可见 |
-| 直播 | Feed、房间/用户/礼物列表、protobuf 拉取与 WebSocket 聊天/点赞/礼物接收 |
-| 私信 | HTTP 会话/消息拉取、文本发送、WebSocket 文本推送接收 |
-| TikTok Shop | 商品详情、首屏及后续评价读取；不含电商写操作 |
+| Content and users | Video details, profiles and post lists, recommendations, search, following/followers, favorites, and notifications |
+| Comments and interactions | Comment and reply retrieval, pagination, posting comments/replies, likes, favorites, and follows |
+| Creator Studio | `creator_publish` for videos; `creator_publish_photos` for photo posts, private by default |
+| Live | Feeds, room/user/gift lists, protobuf fetches, and WebSocket chat/like/gift events |
+| Direct messages | HTTP conversation/message retrieval, text sending, and WebSocket text push events |
+| TikTok Shop | Product details and review retrieval; no e-commerce write operations |
 
-架构按 `api / builder / signing / utils` 分层。普通 Web 与 Creator HTTP 签名在 Python 中从当前请求纯计算；直播和私信 WebSocket 的 `frontierSign`、Shop BSID 使用仓库内 SDK 的本地 Node.js 运行器。抓包签名不作为运行时常量；必需字段、签名集合或长度不符时拒绝请求。不同页面与接口所需的 Cookie、storage、UA、header 顺序及 body 必须来自**同一次真实浏览器会话**。
+The project is layered into `api / builder / signing / utils`. Standard Web and Creator HTTP signatures are calculated in Python from the current request; live and direct-message WebSocket `frontierSign`, plus Shop BSID, use local Node.js runners shipped with the repository. Captured signatures are never used as runtime constants. Requests are rejected when required fields, signature sets, or lengths do not match. Cookies, storage, user-agent, header order, and bodies required by each page or endpoint must come from the **same real browser session**.
 
-## 🚀 快速开始
+## 🚀 Quick start
 
-需要 Python 3.11+；直播/私信 WebSocket 与 Shop BSID 的本地签名另需 Node.js 18+。在项目根目录安装：
+Python 3.11+ is required. Live/direct-message WebSockets and local Shop BSID signing additionally require Node.js 18+. Install from the project root:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-本项目是库；根目录的 `demo.py` 提供私密发布示例，默认只做本地预检。当前唯一已实现的认证入口是 `TiktokAuth.from_cookie`；账密、二维码、短信登录只是明确抛出 `NotImplementedError` 的占位接口。
+This project is a library. The root `demo.py` provides a private publishing example and performs only local preflight checks by default. The only implemented authentication entry point is `TiktokAuth.from_cookie`; password, QR-code, and SMS login are placeholders that explicitly raise `NotImplementedError`.
 
 ```python
 import os
@@ -41,83 +41,115 @@ import os
 from builder.auth import TiktokAuth
 from api.tiktok_web import TiktokWebAPI
 
-# 在自己的应用进程中提供；不要把 Cookie 写入代码或提交到 Git。
+# Provide this through your own application process; do not hard-code or commit Cookies.
 auth = TiktokAuth.from_cookie(
     os.environ["TIKTOK_COOKIE"],
-    local_storage={"g_exp": "当前浏览器的 g_exp"},
-    session_storage={"msToken": "当前浏览器的 msToken"},
-    # 某些签名接口还需要当前页面的 device_id、browser_metrics、
-    # security-sdk storage；缺失时会直接报错，不会伪造默认值。
+    local_storage={"g_exp": "g_exp from the current browser"},
+    session_storage={"msToken": "msToken from the current browser"},
+    # Some signed endpoints also require the current page's device_id,
+    # browser_metrics, and security-sdk storage. Missing values fail
+    # explicitly; the client does not fabricate defaults.
 )
 api = TiktokWebAPI(auth)
 
-# 作品详情来自独立视频页面的 hydration 数据，而非猜测的 JSON API。
+# Video details come from hydration data on the standalone video page,
+# not from a guessed JSON API.
 detail = api.get_video_detail("https://www.tiktok.com/@some_user/video/1234567890")
 print(detail)
 ```
 
-浏览器 Cookie 往往还不足以复现有签名的请求。请同时提供同会话的 `device_id`、`local_storage`、`session_storage`、`document_cookie`、`browser_metrics` 及需要写操作时的 CSRF / ticket-guard 材料。接口不会为了凑浏览器长度而补齐、截断或复用旧签名。具体字段以你当前浏览器请求为准。
+Browser Cookies are often insufficient to reproduce signed requests. Also provide the same-session `device_id`, `local_storage`, `session_storage`, `document_cookie`, `browser_metrics`, and CSRF/ticket-guard material required for write operations. The API never pads, truncates, or reuses old signatures to satisfy browser lengths. Use the fields from your current browser request.
 
-常用调用示例（登录态与页面证据准备好之后）：
+Common calls after login state and page evidence are ready:
 
 ```python
-posts = api.get_user_posted("用户 secUid")
-comments = api.get_all_comments("作品 ID")
+posts = api.get_user_posted("user secUid")
+comments = api.get_all_comments("video ID")
 replies = api.get_all_comment_replies(
-    "作品 ID", "一级评论 ID",
-    referer="当前视频页面 URL",
-    root_referer="当前标签页的根导航 URL",
+    "video ID", "top-level comment ID",
+    referer="current video page URL",
+    root_referer="current tab root navigation URL",
 )
 
-# 默认仅自己可见；需要当前 Creator Studio 的完整浏览器状态。
-result = api.creator_publish("video.mp4", "视频文案")
-photos = api.creator_publish_photos(["1.jpg", "2.jpg"], "图集文案")
+# Private by default; requires the complete current Creator Studio browser state.
+result = api.creator_publish("video.mp4", "video caption")
+photos = api.creator_publish_photos(["1.jpg", "2.jpg"], "photo caption")
 ```
 
-直播接收用 `iter_live_ws_events(live_id, room_id, ...)`；私信接收用 `iter_im_ws_messages(...)`。两者都是迭代器，调用方应自行管理退出事件与重连。私信推送已能连接并解析协议，但由于缺少另一账号发来的测试消息，尚未完成跨账号端到端验收。
+Use `iter_live_ws_events(live_id, room_id, ...)` for live events and `iter_im_ws_messages(...)` for direct messages. Both are iterators; callers manage stop events and reconnects. Direct-message push connections and protocol parsing work, but cross-account end-to-end validation is still pending test messages from another account.
 
-## 🎬 发布 Demo
+## 🎬 Publishing demo
 
-把**同一次**已登录 Chrome Creator Studio 会话资料保存为项目根目录的 `.tiktok-runtime.json`（Git 与 Docker 均已忽略）。这是扁平 JSON 对象：需要 `cookie`（完整请求 Cookie；也可用 `TIKTOK_COOKIE` 环境变量覆盖）、`document_cookie`、`device_id`、`odin_id`、`user_agent`、完整的 `local_storage` / `session_storage` / `browser_metrics` 对象，以及当前 security-sdk 的 `ticket_guard_private_key`、`ticket_guard_encrypt_ticket`、`ticket_guard_ts_sign`、`ticket_guard_public_key`、`ticket_guard_web_version`、`ticket_guard_version`、`ticket_guard_iteration_version`。预检会核对可纯算的 ticket-guard header，绝不复放抓包签名。不要提交这个资料文件。
+Save the **same** logged-in Chrome Creator Studio session profile as `.tiktok-runtime.json` in the project root; Git and Docker ignore it. This is a flat JSON object containing `cookie` (the complete request Cookie; `TIKTOK_COOKIE` can override it), `document_cookie`, `device_id`, `odin_id`, `user_agent`, complete `local_storage` / `session_storage` / `browser_metrics` objects, and the current security-sdk values `ticket_guard_private_key`, `ticket_guard_encrypt_ticket`, `ticket_guard_ts_sign`, `ticket_guard_public_key`, `ticket_guard_web_version`, `ticket_guard_version`, and `ticket_guard_iteration_version`. Preflight recalculates ticket-guard headers and never replays captured signatures. Do not commit this profile.
 
-先预检文件、登录态字段与 ticket-guard 本地纯算，不发网络请求：
+Run local file, login-state, and ticket-guard checks without sending network requests:
 
 ```bash
-python demo.py video ./video.mp4 --text "我的视频"
+python demo.py video ./video.mp4 --text "My video"
 ```
 
-确认资料正确后，显式加 `--publish` 才上传并发布；默认可见范围为**仅自己**：
+After confirming the profile, add `--publish` explicitly to upload and publish. Visibility defaults to **private**:
 
 ```bash
-python demo.py --publish video ./video.mp4 --text "我的视频"
-python demo.py --publish photos ./1.jpg ./2.jpg --text "我的图集" --title "标题"
+python demo.py --publish video ./video.mp4 --text "My video"
+python demo.py --publish photos ./1.jpg ./2.jpg --text "My photo post" --title "Title"
 ```
 
-可用 `--profile 路径` 指定其他本地资料文件。预检只能证明资料结构与本地签名材料可用，不能代替服务器验证登录；实际发布仍会由接口层检查当前请求的全部字段和签名长度。发布中途失败可能已经上传部分媒体，demo 不会自动重试。
+Use `--profile path` to select another local profile. Preflight only verifies the profile structure and local signing material; it does not verify server-side login. The API still checks all request fields and signature lengths during publishing. A mid-publish failure may have uploaded some media; the demo does not retry automatically.
 
-## 📦 运行时目录
+## 🔌 n8n FastAPI Bridge
+
+`bridge.py` exposes a small local HTTP service for n8n:
+
+```powershell
+python -m pip install -r requirements.txt
+$env:TIKTOK_PROFILE = ".tiktok-runtime.json"
+$env:BRIDGE_API_KEY = "replace-with-a-local-secret"
+python bridge.py
+```
+
+Check readiness with `GET http://127.0.0.1:8000/health`. Send a text DM with
+`POST /send-dm` and the `X-Bridge-Key` header when `BRIDGE_API_KEY` is set:
+
+```json
+{
+  "conversation_id": "conversation-id-from-browser",
+  "conversation_short_id": 123456,
+  "text": "Message from n8n"
+}
+```
+
+Incoming-message forwarding is disabled by default because it opens a
+long-lived synchronous WebSocket iterator. Enable it explicitly with
+`BRIDGE_LISTEN_INCOMING=1` and provide `N8N_WEBHOOK_URL`. The bridge never
+extracts browser state and never logs Cookies, private keys, signed URLs, or
+request bodies. Keep the service bound to localhost or protect it with a
+firewall/reverse-proxy rule before exposing it to n8n.
+
+## 📦 Runtime directories
 
 ```text
-api/                         TikTok Web API、兼容入口、登录占位
-builder/                     Cookie/浏览器状态、header、query、签名调度
-signing/                     Python 签名、protobuf、WebMssdk 本地运行器
-reverse/tiktok_shop_bsid/env/ Shop BSID 本地 SDK 运行器与必需 bundle
-static/                      IM protobuf 生成代码（仍被收发接口使用）
-utils/                       HTTP 与兼容工具
-demo.py                      私密视频/图集发布示例（默认不发送）
-author/logo.svg              项目 Logo
+api/                         TikTok Web API, compatibility entry points, login placeholders
+builder/                     Cookies, browser state, headers, queries, and signing dispatch
+signing/                     Python signing, protobuf, and local WebMssdk runner
+reverse/tiktok_shop_bsid/env/ Shop BSID local SDK runner and required bundle
+static/                      Generated IM protobuf code used by message transport
+utils/                       HTTP and compatibility utilities
+demo.py                      Private video/photo publishing example (no request by default)
+bridge.py                    FastAPI/n8n direct-message bridge
+author/logo.svg              Project logo
 ```
 
-`Dockerfile` 包含以上运行时目录，可用 `docker build -t tiktok-apis .` 做环境验证；镜像默认只做导入检查，不会自动登录或执行接口。
+`Dockerfile` includes the runtime directories above. Use `docker build -t tiktok-apis .` to validate the environment; the image only performs import checks by default and does not log in or call APIs.
 
-## ⚠️ 范围与限制
+## ⚠️ Scope and limitations
 
-- Shop 只读；礼物发送/扣费、连麦、PK、直播分享及电商写操作不在项目范围内。
-- 私信目前只实现文本；图片、语音等类型不应视为已支持。
-- 登录仅支持从已有 Cookie 创建会话；Cookie 过期或浏览器端参数变化时，需要重新取得同会话证据。
-- 签名、header 与 body 的对齐基于已取证的页面/接口。TikTok 改版后应重新核对真实浏览器请求，不能把旧样本当作长期稳定协议。
+- Shop support is read-only; gift sending/charging, co-hosting, PK, live sharing, and e-commerce writes are out of scope.
+- Direct messages currently support text only; images, audio, and other types are not supported.
+- Login only creates sessions from an existing Cookie; expired Cookies or browser parameter changes require fresh evidence from the same session.
+- Signature, header, and body alignment is based on captured page/endpoint evidence. Re-check real browser requests after TikTok changes; old samples are not a stable long-term protocol.
 
-## 📈 Star 趋势
+## 📈 Star history
 
 <a href="https://cvcat.site/star-history/svg?repos=cv-cat/TiktokApis&type=Date">
   <picture>
@@ -127,14 +159,14 @@ author/logo.svg              项目 Logo
   </picture>
 </a>
 
-## 🍔 交流群
+## 🍔 Community
 
-如果你对爬虫和 AI Agent 感兴趣，可以加入群聊一起讨论～
+If you are interested in web scraping and AI agents, join the discussion groups.
 
-ps：群满或二维码过期时，可以通过 issue、微信或 QQ 提醒作者。
+PS: If a group is full or a QR code has expired, notify the author through an issue, WeChat, or QQ.
 
-| group-1 | group-2 | group-3 | group-4（2000 人 QQ 群） |
+| group-1 | group-2 | group-3 | group-4 (2,000-member QQ group) |
 |:--:|:--:|:--:|:--:|
 | <img width="280" alt="group-1 QR code" src="https://cvcat.site/assets/group1.jpg" /> | <img width="280" alt="group-2 QR code" src="https://cvcat.site/assets/group2.jpg" /> | <img width="280" alt="group-3 QR code" src="https://cvcat.site/assets/group3.jpg" /> | <img width="280" alt="group-4 QQ QR code" src="https://cvcat.site/assets/group4.jpg" /> |
 
-欢迎针对可复现的请求差异提交 issue 或 PR；提交前请彻底移除个人会话信息。
+Please open an issue or PR for reproducible request differences. Remove all personal session information before submitting.

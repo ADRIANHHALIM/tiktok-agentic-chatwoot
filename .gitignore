@@ -36,6 +36,7 @@ datas
 .env.*
 # Browser captures contain live session cookies and opaque signatures.
 .tiktok-runtime*.json
+session.json
 *.network-request
 *.network-response
 signing/evidence_cookie.json
