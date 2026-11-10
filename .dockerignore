@@ -17,3 +17,6 @@ static/node_modules/
 .env
 .env.*
 .tiktok-runtime*.json
+session.json
+*.network-request
+*.network-response

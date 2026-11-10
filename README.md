@@ -1,18 +1,6 @@
-<div align="center">
-  <img src="./author/logo.svg" width="320" alt="TikTok APIs logo">
-  <p>
-    <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB" alt="Python 3.11+"></a>
-    <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-18%2B-339933" alt="Node.js 18+"></a>
-  </p>
+> For learning only. Use your own account and browser session, follow platform rules, and never submit Cookies, private keys, or network captures.
 
-  # 🎵 TikTok APIs
-
-  **Python implementation of TikTok Web data access, interactions, Creator publishing, and real-time messaging APIs.**
-</div>
-
-> For learning and technical research only. Use your own account and browser session, follow platform rules, and never submit Cookies, private keys, or network captures.
-
-## 🌟 Features
+## Features
 
 | Area | Available entry points |
 | --- | --- |
@@ -25,7 +13,7 @@
 
 The project is layered into `api / builder / signing / utils`. Standard Web and Creator HTTP signatures are calculated in Python from the current request; live and direct-message WebSocket `frontierSign`, plus Shop BSID, use local Node.js runners shipped with the repository. Captured signatures are never used as runtime constants. Requests are rejected when required fields, signature sets, or lengths do not match. Cookies, storage, user-agent, header order, and bodies required by each page or endpoint must come from the **same real browser session**.
 
-## 🚀 Quick start
+## Quick start
 
 Python 3.11+ is required. Live/direct-message WebSockets and local Shop BSID signing additionally require Node.js 18+. Install from the project root:
 
@@ -78,7 +66,7 @@ photos = api.creator_publish_photos(["1.jpg", "2.jpg"], "photo caption")
 
 Use `iter_live_ws_events(live_id, room_id, ...)` for live events and `iter_im_ws_messages(...)` for direct messages. Both are iterators; callers manage stop events and reconnects. Direct-message push connections and protocol parsing work, but cross-account end-to-end validation is still pending test messages from another account.
 
-## 🎬 Publishing demo
+## Publishing demo
 
 Save the **same** logged-in Chrome Creator Studio session profile as `.tiktok-runtime.json` in the project root; Git and Docker ignore it. This is a flat JSON object containing `cookie` (the complete request Cookie; `TIKTOK_COOKIE` can override it), `document_cookie`, `device_id`, `odin_id`, `user_agent`, complete `local_storage` / `session_storage` / `browser_metrics` objects, and the current security-sdk values `ticket_guard_private_key`, `ticket_guard_encrypt_ticket`, `ticket_guard_ts_sign`, `ticket_guard_public_key`, `ticket_guard_web_version`, `ticket_guard_version`, and `ticket_guard_iteration_version`. Preflight recalculates ticket-guard headers and never replays captured signatures. Do not commit this profile.
 
@@ -97,7 +85,7 @@ python demo.py --publish photos ./1.jpg ./2.jpg --text "My photo post" --title "
 
 Use `--profile path` to select another local profile. Preflight only verifies the profile structure and local signing material; it does not verify server-side login. The API still checks all request fields and signature lengths during publishing. A mid-publish failure may have uploaded some media; the demo does not retry automatically.
 
-## 🔌 n8n FastAPI Bridge
+## n8n FastAPI Bridge
 
 `bridge.py` exposes a small local HTTP service for n8n:
 
@@ -109,7 +97,7 @@ python bridge.py
 ```
 
 Check readiness with `GET http://127.0.0.1:8000/health`. Send a text DM with
-`POST /send-dm` and the `X-Bridge-Key` header when `BRIDGE_API_KEY` is set:
+`POST /send-dm` and the required `X-Bridge-Key` header:
 
 ```json
 {
@@ -126,7 +114,12 @@ extracts browser state and never logs Cookies, private keys, signed URLs, or
 request bodies. Keep the service bound to localhost or protect it with a
 firewall/reverse-proxy rule before exposing it to n8n.
 
-## 📦 Runtime directories
+The service returns `503` until both the runtime profile and
+`BRIDGE_API_KEY` are configured. In Docker, mount the ignored profile file at
+`/app/.tiktok-runtime.json` and pass the API key as a runtime secret; never
+bake either into the image.
+
+## Runtime directories
 
 ```text
 api/                         TikTok Web API, compatibility entry points, login placeholders
@@ -140,33 +133,15 @@ bridge.py                    FastAPI/n8n direct-message bridge
 author/logo.svg              Project logo
 ```
 
-`Dockerfile` includes the runtime directories above. Use `docker build -t tiktok-apis .` to validate the environment; the image only performs import checks by default and does not log in or call APIs.
+`Dockerfile` includes the runtime directories above and starts the FastAPI
+Bridge on port `8000`. Use `docker build -t tiktok-apis .` to validate the
+environment; provide the ignored runtime profile and API key only at runtime.
 
-## ⚠️ Scope and limitations
+## Scope and limitations
 
 - Shop support is read-only; gift sending/charging, co-hosting, PK, live sharing, and e-commerce writes are out of scope.
 - Direct messages currently support text only; images, audio, and other types are not supported.
 - Login only creates sessions from an existing Cookie; expired Cookies or browser parameter changes require fresh evidence from the same session.
 - Signature, header, and body alignment is based on captured page/endpoint evidence. Re-check real browser requests after TikTok changes; old samples are not a stable long-term protocol.
-
-## 📈 Star history
-
-<a href="https://cvcat.site/star-history/svg?repos=cv-cat/TiktokApis&type=Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://cvcat.site/star-history/svg?repos=cv-cat/TiktokApis&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://cvcat.site/star-history/svg?repos=cv-cat/TiktokApis&type=Date" />
-    <img alt="TikTok APIs Star History Chart" src="https://cvcat.site/star-history/svg?repos=cv-cat/TiktokApis&type=Date" />
-  </picture>
-</a>
-
-## 🍔 Community
-
-If you are interested in web scraping and AI agents, join the discussion groups.
-
-PS: If a group is full or a QR code has expired, notify the author through an issue, WeChat, or QQ.
-
-| group-1 | group-2 | group-3 | group-4 (2,000-member QQ group) |
-|:--:|:--:|:--:|:--:|
-| <img width="280" alt="group-1 QR code" src="https://cvcat.site/assets/group1.jpg" /> | <img width="280" alt="group-2 QR code" src="https://cvcat.site/assets/group2.jpg" /> | <img width="280" alt="group-3 QR code" src="https://cvcat.site/assets/group3.jpg" /> | <img width="280" alt="group-4 QQ QR code" src="https://cvcat.site/assets/group4.jpg" /> |
 
 Please open an issue or PR for reproducible request differences. Remove all personal session information before submitting.

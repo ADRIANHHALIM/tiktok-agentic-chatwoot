@@ -64,7 +64,12 @@ def _load_api() -> TiktokWebAPI:
 async def _require_api_key(
     x_bridge_key: str | None = Header(default=None),
 ) -> None:
-    if BRIDGE_API_KEY and x_bridge_key != BRIDGE_API_KEY:
+    if not BRIDGE_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Bridge API key belum dikonfigurasi",
+        )
+    if x_bridge_key != BRIDGE_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Bridge API key tidak valid",
@@ -91,9 +96,12 @@ def _listener_worker(api: TiktokWebAPI, stop_event: Event) -> None:
                     if stop_event.is_set():
                         break
                     client.post(N8N_WEBHOOK_URL, json=message).raise_for_status()
-        except Exception:
+        except Exception as exc:
             if not stop_event.is_set():
-                LOGGER.exception("Listener IM terputus; mencoba ulang setelah 5 detik")
+                LOGGER.error(
+                    "Listener IM terputus (%s); mencoba ulang setelah 5 detik",
+                    type(exc).__name__,
+                )
                 stop_event.wait(5)
 
 
@@ -107,6 +115,7 @@ async def lifespan(app: FastAPI):
         LOGGER.warning("TikTok API belum siap: %s", exc)
     app.state.stop_event = Event()
     app.state.listener_task = None
+    app.state.send_lock = asyncio.Lock()
     if LISTEN_INCOMING and app.state.api is not None:
         app.state.listener_task = asyncio.create_task(
             asyncio.to_thread(_listener_worker, app.state.api, app.state.stop_event)
@@ -126,8 +135,13 @@ app = FastAPI(title="TikTok n8n Bridge", lifespan=lifespan)
 @app.get("/health")
 async def health() -> dict[str, Any]:
     api = getattr(app.state, "api", None)
+    if api is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="TikTok runtime profile belum siap",
+        )
     return {
-        "status": "ok" if api is not None else "not_ready",
+        "status": "ok",
         "profile": str(PROFILE_PATH),
         "listener_enabled": LISTEN_INCOMING,
     }
@@ -142,15 +156,16 @@ async def send_dm(payload: SendMessageRequest) -> dict[str, Any]:
             detail="TikTok runtime profile belum siap",
         )
     try:
-        result = await run_in_threadpool(_send_message, api, payload)
+        async with app.state.send_lock:
+            result = await run_in_threadpool(_send_message, api, payload)
     except (BrowserEvidenceError, ValueError) as exc:
         LOGGER.warning("DM ditolak karena browser evidence tidak lengkap: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Browser evidence tidak lengkap atau tidak valid",
         ) from exc
-    except Exception:
-        LOGGER.exception("Pengiriman DM gagal")
+    except Exception as exc:
+        LOGGER.error("Pengiriman DM gagal (%s)", type(exc).__name__)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Pengiriman pesan TikTok gagal",
@@ -163,7 +178,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "bridge:app",
-        host=os.getenv("BRIDGE_HOST", "127.0.0.1"),
+        host=os.getenv("BRIDGE_HOST", "0.0.0.0"),
         port=int(os.getenv("BRIDGE_PORT", "8000")),
         reload=False,
     )

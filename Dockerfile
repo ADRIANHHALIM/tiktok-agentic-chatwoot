@@ -21,6 +21,9 @@ COPY reverse/tiktok_shop_bsid/env ./reverse/tiktok_shop_bsid/env
 COPY static ./static
 COPY utils ./utils
 COPY demo.py ./
+COPY bridge.py ./
 COPY README.md ./
 
-CMD ["python", "-c", "import api.tiktok, api.tiktok_chat; print('TikTok Reverse API image ready')"]
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "bridge:app", "--host", "0.0.0.0", "--port", "8000"]
